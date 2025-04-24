@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
@@ -38,6 +37,7 @@ interface GameContextType {
   resetGame: () => void;
   readyUp: (playerId: string) => void;
   leaveRoom: () => void;
+  checkAllReady: () => boolean;
 }
 
 const initialQuestions: Question[] = [
@@ -119,7 +119,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [questions] = useState<Question[]>(initialQuestions);
   const [socket, setSocket] = useState<Socket | null>(null);
   
-  // Check if all players are ready - new function
   const checkAllReady = useCallback(() => {
     if (players.length === 0) return false;
     return players.every(player => player.isReady);
@@ -136,7 +135,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       newSocket.on('playerJoined', (newPlayer: Player) => {
         console.log('Player joined:', newPlayer);
         setPlayers(prevPlayers => {
-          // Check if player already exists to prevent duplicates
           const playerExists = prevPlayers.some(p => p.id === newPlayer.id);
           if (playerExists) return prevPlayers;
           return [...prevPlayers, newPlayer];
@@ -192,14 +190,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
   
-  // Monitor players array for debugging
-  useEffect(() => {
-    console.log('Players updated:', players);
-    if (players.length > 0 && checkAllReady()) {
-      console.log('All players are ready!');
-    }
-  }, [players, checkAllReady]);
-  
   useEffect(() => {
     return () => {
       if (socket) {
@@ -242,7 +232,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     const countdownInterval = setInterval(() => {
       countdown -= 1;
       setGameStartCountdown(prevCount => {
-        // Make sure we're updating based on the latest state
         const newCount = prevCount - 1;
         console.log('Countdown:', newCount);
         return newCount;
@@ -330,11 +319,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     
     toast.info("You're ready to play!");
     
-    // Log player readiness status
     console.log('Player ready:', playerId);
     console.log('All players ready:', checkAllReady());
     
-    // Notify server if all players are ready
     const allPlayersReady = checkAllReady();
     if (allPlayersReady && players.length > 0) {
       socket.emit('allPlayersReady', { roomCode });
