@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +20,8 @@ const GameRoom = () => {
     questions,
     gameElapsedTime,
     endGame,
-    socket
+    socket,
+    checkAllReady
   } = useGame();
   
   const { user } = useAuth();
@@ -32,6 +32,7 @@ const GameRoom = () => {
   // Connect to the room when component mounts
   useEffect(() => {
     if (socket && roomCode && user) {
+      console.log("Joining room:", roomCode, "with user:", user.username);
       // Emit join room event with user details
       socket.emit('joinRoom', {
         roomCode,
@@ -43,6 +44,14 @@ const GameRoom = () => {
       });
     }
   }, [socket, roomCode, user]);
+
+  // Check if all players are ready and start game if they are
+  useEffect(() => {
+    if (players.length > 0 && checkAllReady() && !isGameActive && gameStartCountdown === 10) {
+      console.log("All players ready, starting game automatically");
+      startGame();
+    }
+  }, [players, checkAllReady, isGameActive, gameStartCountdown, startGame]);
 
   const copyRoomCode = () => {
     if (!roomCode) return;
@@ -59,6 +68,7 @@ const GameRoom = () => {
     
     setIsReady(true);
     readyUp(user.id);
+    console.log("Player ready:", user.id);
   };
 
   const handleGameComplete = () => {
@@ -89,7 +99,6 @@ const GameRoom = () => {
         <h3 className="text-xl font-semibold text-game-gold mb-4">Leaderboard</h3>
         
         <div className="space-y-3 mb-6">
-          {/* Display actual player results ordered by completion time */}
           {players
             .sort((a, b) => (a.completionTime || 999) - (b.completionTime || 999))
             .map((player, index) => (

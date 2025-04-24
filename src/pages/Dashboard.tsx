@@ -12,10 +12,12 @@ const Dashboard = () => {
   useEffect(() => {
     if (socket) {
       const handleConnect = () => {
+        console.log("Socket connected");
         setIsConnected(true);
       };
 
       const handleDisconnect = () => {
+        console.log("Socket disconnected");
         setIsConnected(false);
       };
 
@@ -24,6 +26,12 @@ const Dashboard = () => {
       
       // Initial connection state
       setIsConnected(socket.connected);
+      
+      if (socket.connected) {
+        console.log("Socket already connected at mount");
+      } else {
+        console.log("Socket not connected at mount");
+      }
 
       return () => {
         socket.off('connect', handleConnect);

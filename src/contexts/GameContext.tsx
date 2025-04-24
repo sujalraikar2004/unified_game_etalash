@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
 
@@ -118,6 +119,12 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [questions] = useState<Question[]>(initialQuestions);
   const [socket, setSocket] = useState<Socket | null>(null);
   
+  // Check if all players are ready - new function
+  const checkAllReady = useCallback(() => {
+    if (players.length === 0) return false;
+    return players.every(player => player.isReady);
+  }, [players]);
+  
   useEffect(() => {
     if (!socket) {
       const newSocket = io(SOCKET_SERVER_URL);
@@ -127,15 +134,23 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       });
       
       newSocket.on('playerJoined', (newPlayer: Player) => {
-        setPlayers(prevPlayers => [...prevPlayers, newPlayer]);
+        console.log('Player joined:', newPlayer);
+        setPlayers(prevPlayers => {
+          // Check if player already exists to prevent duplicates
+          const playerExists = prevPlayers.some(p => p.id === newPlayer.id);
+          if (playerExists) return prevPlayers;
+          return [...prevPlayers, newPlayer];
+        });
         toast.info(`${newPlayer.username} joined the room`);
       });
       
       newSocket.on('playerLeft', (playerId: string) => {
+        console.log('Player left:', playerId);
         setPlayers(prevPlayers => prevPlayers.filter(p => p.id !== playerId));
       });
       
       newSocket.on('playerReady', (playerId: string) => {
+        console.log('Player ready:', playerId);
         setPlayers(prevPlayers => 
           prevPlayers.map(p => 
             p.id === playerId ? { ...p, isReady: true } : p
@@ -144,6 +159,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       });
       
       newSocket.on('gameStart', () => {
+        console.log('Game starting from server event');
         startGame();
       });
       
@@ -161,6 +177,13 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         setRoomCode(code);
       });
       
+      newSocket.on('roomState', (roomData: any) => {
+        console.log('Room state received:', roomData);
+        if (roomData.players) {
+          setPlayers(roomData.players);
+        }
+      });
+      
       setSocket(newSocket);
       
       return () => {
@@ -168,6 +191,14 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       };
     }
   }, []);
+  
+  // Monitor players array for debugging
+  useEffect(() => {
+    console.log('Players updated:', players);
+    if (players.length > 0 && checkAllReady()) {
+      console.log('All players are ready!');
+    }
+  }, [players, checkAllReady]);
   
   useEffect(() => {
     return () => {
@@ -199,8 +230,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     toast.success("Joined room successfully!");
   };
 
-  const startGame = () => {
+  const startGame = useCallback(() => {
     if (!socket) return;
+    console.log('Starting game countdown');
     
     socket.emit('startCountdown', { roomCode });
     
@@ -209,10 +241,16 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     
     const countdownInterval = setInterval(() => {
       countdown -= 1;
-      setGameStartCountdown(countdown);
+      setGameStartCountdown(prevCount => {
+        // Make sure we're updating based on the latest state
+        const newCount = prevCount - 1;
+        console.log('Countdown:', newCount);
+        return newCount;
+      });
       
       if (countdown <= 0) {
         clearInterval(countdownInterval);
+        console.log('Countdown complete, starting game');
         
         setIsGameActive(true);
         setActiveQuestion(questions[0]);
@@ -224,7 +262,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         return () => clearInterval(gameTimer);
       }
     }, 1000);
-  };
+  }, [socket, roomCode, questions]);
 
   const submitAnswer = (answer: string): boolean => {
     if (!activeQuestion || !socket) return false;
@@ -292,7 +330,12 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     
     toast.info("You're ready to play!");
     
-    const allPlayersReady = players.every(p => p.id === playerId || p.isReady);
+    // Log player readiness status
+    console.log('Player ready:', playerId);
+    console.log('All players ready:', checkAllReady());
+    
+    // Notify server if all players are ready
+    const allPlayersReady = checkAllReady();
     if (allPlayersReady && players.length > 0) {
       socket.emit('allPlayersReady', { roomCode });
     }
@@ -329,6 +372,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         resetGame,
         readyUp,
         leaveRoom,
+        checkAllReady,
       }}
     >
       {children}

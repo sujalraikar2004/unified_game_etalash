@@ -4,7 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { User, Circle } from 'lucide-react';
 
 const GameStatus = () => {
-  const { players, isGameActive } = useGame();
+  const { players, isGameActive, checkAllReady } = useGame();
   
   // Display different statuses based on player state
   const getPlayerStatus = (isReady: boolean) => {
@@ -17,11 +17,20 @@ const GameStatus = () => {
       <span className="text-yellow-500">Not Ready</span>;
   };
 
+  // Calculate and display how many players are ready
+  const getReadyCount = () => {
+    const readyCount = players.filter(player => player.isReady).length;
+    return `${readyCount}/${players.length} players ready`;
+  };
+
   return (
     <div className="w-full">
-      <div className="flex items-center mb-3">
-        <User className="text-game-gold mr-2" size={20} />
-        <h3 className="text-lg font-semibold text-white">Players Status</h3>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center">
+          <User className="text-game-gold mr-2" size={20} />
+          <h3 className="text-lg font-semibold text-white">Players Status</h3>
+        </div>
+        <span className="text-sm text-white/70">{getReadyCount()}</span>
       </div>
       
       <div className="space-y-2">

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -125,6 +124,11 @@ io.on('connection', (socket) => {
 
       const activeRoom = activeRooms.get(roomCode);
       
+      // Track the socket id with the user for future reference
+      socket.userId = user.id;
+      socket.roomCode = roomCode;
+      
+      // Check if player already exists in the room to avoid duplicates
       if (!activeRoom.players.find(p => p.id === user.id)) {
         activeRoom.players.push({
           id: user.id,
@@ -135,7 +139,6 @@ io.on('connection', (socket) => {
       }
 
       socket.join(roomCode);
-      socket.roomCode = roomCode;
 
       // Broadcast to other players in the room
       socket.to(roomCode).emit('playerJoined', {
@@ -148,7 +151,7 @@ io.on('connection', (socket) => {
       // Send current room state to the new player
       socket.emit('roomState', activeRoom);
       
-      console.log(`User ${user.username} joined room ${roomCode}`);
+      console.log(`User ${user.username} joined room ${roomCode}, players in room:`, activeRoom.players.length);
     } catch (error) {
       console.error('Error joining room:', error);
       socket.emit('error', { message: 'Failed to join room' });
@@ -157,7 +160,12 @@ io.on('connection', (socket) => {
 
   // Player ready status
   socket.on('playerReady', ({ roomCode, playerId }) => {
-    if (!activeRooms.has(roomCode)) return;
+    console.log(`Player ${playerId} ready in room ${roomCode}`);
+    
+    if (!activeRooms.has(roomCode)) {
+      console.log('Room not found:', roomCode);
+      return;
+    }
 
     const room = activeRooms.get(roomCode);
     const playerIndex = room.players.findIndex(p => p.id === playerId);
@@ -165,15 +173,34 @@ io.on('connection', (socket) => {
     if (playerIndex !== -1) {
       room.players[playerIndex].isReady = true;
       
-      socket.to(roomCode).emit('playerReady', playerId);
+      // Broadcast player ready to everyone in the room
+      io.to(roomCode).emit('playerReady', playerId);
       
       // Check if all players are ready
       const allReady = room.players.every(p => p.isReady);
       
-      if (allReady && room.players.length > 1) {
+      console.log(`All players ready in room ${roomCode}: ${allReady}`);
+      console.log(`Players in room: ${room.players.length}`);
+      
+      if (allReady && room.players.length > 0) {
         // Start the game countdown
+        console.log(`Starting game in room ${roomCode}`);
         io.to(roomCode).emit('gameStart');
       }
+    }
+  });
+
+  // All players ready notification
+  socket.on('allPlayersReady', ({ roomCode }) => {
+    if (!activeRooms.has(roomCode)) return;
+    
+    const room = activeRooms.get(roomCode);
+    const allReady = room.players.every(p => p.isReady);
+    
+    // Double check all players are actually ready
+    if (allReady && room.players.length > 0) {
+      console.log(`All players ready confirmed in room ${roomCode}, starting game`);
+      io.to(roomCode).emit('gameStart');
     }
   });
 
@@ -184,6 +211,7 @@ io.on('connection', (socket) => {
     const room = activeRooms.get(roomCode);
     room.isGameActive = true;
     
+    console.log(`Game countdown started in room ${roomCode}`);
     io.to(roomCode).emit('gameStart');
   });
 
@@ -280,10 +308,16 @@ function handlePlayerDisconnect(socket, roomCode) {
   if (!roomCode || !activeRooms.has(roomCode)) return;
   
   const room = activeRooms.get(roomCode);
-  const playerId = socket.id;
+  const playerId = socket.userId;
+  
+  if (!playerId) {
+    console.log('No userId found for socket:', socket.id);
+    return;
+  }
   
   // Remove player from room
   room.players = room.players.filter(p => p.id !== playerId);
+  console.log(`Player ${playerId} removed from room ${roomCode}`);
   
   // Notify other players
   socket.to(roomCode).emit('playerLeft', playerId);
@@ -291,6 +325,7 @@ function handlePlayerDisconnect(socket, roomCode) {
   // Remove room if empty
   if (room.players.length === 0) {
     activeRooms.delete(roomCode);
+    console.log(`Room ${roomCode} removed (empty)`);
     
     // Update room in database
     Room.findOneAndUpdate(
