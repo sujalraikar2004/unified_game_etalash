@@ -4,6 +4,8 @@ import { useGame } from '@/contexts/GameContext';
 import Header from '@/components/Layout/Header';
 import RoomSelection from '@/components/Game/RoomSelection';
 import GameRoom from '@/components/Game/GameRoom';
+import Leaderboard from '@/components/Game/Leaderboard';
+import UserFinishingTime from './UserFinishingTime';
 
 const Dashboard = () => {
   const { roomCode, socket } = useGame();
@@ -53,6 +55,9 @@ const Dashboard = () => {
         )}
         
         <div className="max-w-2xl mx-auto">
+          <Leaderboard />
+          {/* Show current user's finishing time if available */}
+          <UserFinishingTime />
           {roomCode ? <GameRoom /> : <RoomSelection />}
         </div>
       </main>

@@ -112,11 +112,11 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [activeQuestion, setActiveQuestion] = useState<Question | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
   const [timeRemaining, setTimeRemaining] = useState(10);
   const [gameStartCountdown, setGameStartCountdown] = useState(10);
   const [gameElapsedTime, setGameElapsedTime] = useState(0);
   const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [questions] = useState<Question[]>(initialQuestions);
   const [socket, setSocket] = useState<Socket | null>(null);
   
   const checkAllReady = useCallback(() => {
@@ -304,6 +304,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setCurrentQuestionIndex(0);
     setGameElapsedTime(0);
     setGameStartCountdown(10);
+    setQuestions(initialQuestions);
   };
 
   const readyUp = (playerId: string) => {

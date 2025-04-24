@@ -342,7 +342,7 @@ function handlePlayerDisconnect(socket, roomCode) {
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const players = await Player.find()
-      .sort({ highScore: -1 })
+      .sort({ fastestTime: 1 }) // Least time first
       .limit(10);
     
     res.json(players);
