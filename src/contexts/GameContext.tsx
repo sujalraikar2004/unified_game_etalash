@@ -1,6 +1,6 @@
-
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { toast } from "sonner";
+import { io, Socket } from "socket.io-client";
 
 interface Question {
   id: number;
@@ -13,6 +13,7 @@ interface Player {
   id: string;
   username: string;
   score: number;
+  isReady: boolean;
   completionTime?: number;
 }
 
@@ -26,6 +27,7 @@ interface GameContextType {
   gameElapsedTime: number;
   roomCode: string | null;
   questions: Question[];
+  socket: Socket | null;
   
   startGame: () => void;
   joinRoom: (code: string) => void;
@@ -100,6 +102,8 @@ const initialQuestions: Question[] = [
   }
 ];
 
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
+
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider = ({ children }: { children: ReactNode }) => {
@@ -112,30 +116,94 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [gameElapsedTime, setGameElapsedTime] = useState(0);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [questions] = useState<Question[]>(initialQuestions);
-  const [readyPlayers, setReadyPlayers] = useState<Set<string>>(new Set());
-
-  // In a real implementation, this would use WebSockets for real-time communication
+  const [socket, setSocket] = useState<Socket | null>(null);
+  
+  useEffect(() => {
+    if (!socket) {
+      const newSocket = io(SOCKET_SERVER_URL);
+      
+      newSocket.on('connect', () => {
+        console.log('Connected to game server');
+      });
+      
+      newSocket.on('playerJoined', (newPlayer: Player) => {
+        setPlayers(prevPlayers => [...prevPlayers, newPlayer]);
+        toast.info(`${newPlayer.username} joined the room`);
+      });
+      
+      newSocket.on('playerLeft', (playerId: string) => {
+        setPlayers(prevPlayers => prevPlayers.filter(p => p.id !== playerId));
+      });
+      
+      newSocket.on('playerReady', (playerId: string) => {
+        setPlayers(prevPlayers => 
+          prevPlayers.map(p => 
+            p.id === playerId ? { ...p, isReady: true } : p
+          )
+        );
+      });
+      
+      newSocket.on('gameStart', () => {
+        startGame();
+      });
+      
+      newSocket.on('updateQuestion', (questionIndex: number) => {
+        setCurrentQuestionIndex(questionIndex);
+        setActiveQuestion(questions[questionIndex]);
+      });
+      
+      newSocket.on('gameEnd', (finalPlayers: Player[]) => {
+        setPlayers(finalPlayers);
+        endGame();
+      });
+      
+      newSocket.on('roomCreated', (code: string) => {
+        setRoomCode(code);
+      });
+      
+      setSocket(newSocket);
+      
+      return () => {
+        newSocket.disconnect();
+      };
+    }
+  }, []);
+  
+  useEffect(() => {
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [socket]);
   
   const generateRoomCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
   const createRoom = () => {
+    if (!socket) return;
+    
     const code = generateRoomCode();
+    socket.emit('createRoom', { roomCode: code });
     setRoomCode(code);
     toast.success(`Room created! Code: ${code}`);
     return code;
   };
 
   const joinRoom = (code: string) => {
-    // In a real app, this would verify the room exists
+    if (!socket) return;
+    
+    socket.emit('joinRoom', { roomCode: code });
     setRoomCode(code);
-    // Add current player to the room
     toast.success("Joined room successfully!");
   };
 
   const startGame = () => {
-    // Start countdown
+    if (!socket) return;
+    
+    socket.emit('startCountdown', { roomCode });
+    
     let countdown = 10;
     setGameStartCountdown(countdown);
     
@@ -146,28 +214,29 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       if (countdown <= 0) {
         clearInterval(countdownInterval);
         
-        // Start the actual game
         setIsGameActive(true);
         setActiveQuestion(questions[0]);
         
-        // Start game timer
         const gameTimer = setInterval(() => {
           setGameElapsedTime(prevTime => prevTime + 1);
         }, 1000);
         
-        // Cleanup function would clear this interval
         return () => clearInterval(gameTimer);
       }
     }, 1000);
   };
 
   const submitAnswer = (answer: string): boolean => {
-    if (!activeQuestion) return false;
+    if (!activeQuestion || !socket) return false;
     
     const isCorrect = answer.toLowerCase().trim() === activeQuestion.answer.toLowerCase().trim();
     
     if (isCorrect) {
-      // Move to next question
+      socket.emit('correctAnswer', { 
+        roomCode, 
+        questionIndex: currentQuestionIndex 
+      });
+      
       const nextIndex = currentQuestionIndex + 1;
       setCurrentQuestionIndex(nextIndex);
       
@@ -175,8 +244,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         setActiveQuestion(questions[nextIndex]);
         toast.success("Correct! Moving to next question");
       } else {
-        // Game completed
         toast.success("You've completed all questions!");
+        socket.emit('completeGame', { roomCode, time: gameElapsedTime });
         endGame();
       }
     } else {
@@ -189,13 +258,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const endGame = () => {
     setIsGameActive(false);
     
-    // Calculate final scores
-    // In a real implementation, this would involve server-side validation
-    
-    // For now, just mock a random completion time for demo players
     const updatedPlayers = players.map(player => ({
       ...player,
-      completionTime: gameElapsedTime + Math.floor(Math.random() * 60)
+      completionTime: player.completionTime || gameElapsedTime + Math.floor(Math.random() * 60)
     }));
     
     setPlayers(updatedPlayers);
@@ -203,28 +268,41 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetGame = () => {
+    if (socket) {
+      socket.emit('resetGame', { roomCode });
+    }
+    
     setIsGameActive(false);
     setActiveQuestion(null);
     setCurrentQuestionIndex(0);
     setGameElapsedTime(0);
     setGameStartCountdown(10);
-    setReadyPlayers(new Set());
   };
 
   const readyUp = (playerId: string) => {
-    const updatedReadyPlayers = new Set(readyPlayers);
-    updatedReadyPlayers.add(playerId);
-    setReadyPlayers(updatedReadyPlayers);
+    if (!socket) return;
+    
+    socket.emit('playerReady', { roomCode, playerId });
+    
+    setPlayers(prevPlayers => 
+      prevPlayers.map(p => 
+        p.id === playerId ? { ...p, isReady: true } : p
+      )
+    );
     
     toast.info("You're ready to play!");
     
-    // If all players are ready, start the countdown automatically
-    if (updatedReadyPlayers.size === players.length && players.length > 0) {
-      startGame();
+    const allPlayersReady = players.every(p => p.id === playerId || p.isReady);
+    if (allPlayersReady && players.length > 0) {
+      socket.emit('allPlayersReady', { roomCode });
     }
   };
 
   const leaveRoom = () => {
+    if (socket) {
+      socket.emit('leaveRoom', { roomCode });
+    }
+    
     setRoomCode(null);
     resetGame();
     toast.info("You've left the room");
@@ -242,6 +320,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         gameElapsedTime,
         roomCode,
         questions,
+        socket,
         startGame,
         joinRoom,
         createRoom,

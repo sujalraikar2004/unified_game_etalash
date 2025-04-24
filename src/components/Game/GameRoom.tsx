@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import QuestionDisplay from './QuestionDisplay';
 import GameTimer from './GameTimer';
+import GameStatus from './GameStatus';
 import { Check, Copy, Trophy, Users } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -19,13 +20,29 @@ const GameRoom = () => {
     currentQuestionIndex,
     questions,
     gameElapsedTime,
-    endGame
+    endGame,
+    socket
   } = useGame();
   
   const { user } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Connect to the room when component mounts
+  useEffect(() => {
+    if (socket && roomCode && user) {
+      // Emit join room event with user details
+      socket.emit('joinRoom', {
+        roomCode,
+        user: {
+          id: user.id,
+          username: user.username,
+          isReady: false
+        }
+      });
+    }
+  }, [socket, roomCode, user]);
 
   const copyRoomCode = () => {
     if (!roomCode) return;
@@ -48,20 +65,6 @@ const GameRoom = () => {
     endGame();
     setShowResults(true);
   };
-
-  // For demo only - add mock players
-  useEffect(() => {
-    if (roomCode && !isGameActive && players.length === 0 && user) {
-      // Simulating other players joining
-      const mockPlayers = [
-        { id: user.id, username: user.username, score: 0 },
-        { id: 'player2', username: 'TreasureSeeker', score: 0 },
-        { id: 'player3', username: 'GoldHunter', score: 0 },
-        { id: 'player4', username: 'MapMaster', score: 0 }
-      ];
-      // In a real app, this would come from WebSockets
-    }
-  }, [roomCode, isGameActive, players, user]);
 
   // Current game state UI
   if (showResults) {
@@ -86,38 +89,25 @@ const GameRoom = () => {
         <h3 className="text-xl font-semibold text-game-gold mb-4">Leaderboard</h3>
         
         <div className="space-y-3 mb-6">
-          {/* Mock leaderboard - would use actual player results in real app */}
-          <div className="bg-game-gold/20 border border-game-gold p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="bg-game-gold text-game-dark w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">1</span>
-              <span className="font-semibold">TreasureSeeker</span>
-            </div>
-            <span>950 points</span>
-          </div>
-          
-          <div className="bg-white/10 p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">2</span>
-              <span className="font-semibold">{user?.username}</span>
-            </div>
-            <span>820 points</span>
-          </div>
-          
-          <div className="bg-white/10 p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">3</span>
-              <span className="font-semibold">GoldHunter</span>
-            </div>
-            <span>780 points</span>
-          </div>
-          
-          <div className="bg-white/10 p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">4</span>
-              <span className="font-semibold">MapMaster</span>
-            </div>
-            <span>650 points</span>
-          </div>
+          {/* Display actual player results ordered by completion time */}
+          {players
+            .sort((a, b) => (a.completionTime || 999) - (b.completionTime || 999))
+            .map((player, index) => (
+              <div 
+                key={player.id}
+                className={`${index === 0 ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/10'} p-3 rounded-lg flex justify-between items-center`}
+              >
+                <div className="flex items-center">
+                  <span 
+                    className={`${index === 0 ? 'bg-game-gold text-game-dark' : 'bg-white/20'} w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="font-semibold">{player.username} {player.id === user?.id ? '(You)' : ''}</span>
+                </div>
+                <span>{player.score} points</span>
+              </div>
+            ))}
         </div>
         
         <Button 
@@ -182,59 +172,7 @@ const GameRoom = () => {
       </div>
       
       <div className="bg-white/5 rounded-lg p-4 mb-6">
-        <div className="flex items-center mb-3">
-          <Users className="text-game-gold mr-2" size={20} />
-          <h3 className="text-lg font-semibold text-white">Players</h3>
-        </div>
-        
-        <div className="space-y-2">
-          {/* Current user */}
-          <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>{user?.username} (You)</span>
-            </div>
-            {isReady ? (
-              <span className="text-green-500 flex items-center text-sm">
-                <Check size={16} className="mr-1" />
-                Ready
-              </span>
-            ) : (
-              <span className="text-yellow-500 text-sm">Not Ready</span>
-            )}
-          </div>
-          
-          {/* Mock players - in a real app, these would come from server */}
-          <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>TreasureSeeker</span>
-            </div>
-            <span className="text-green-500 flex items-center text-sm">
-              <Check size={16} className="mr-1" />
-              Ready
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>GoldHunter</span>
-            </div>
-            <span className="text-yellow-500 text-sm">Not Ready</span>
-          </div>
-          
-          <div className="flex items-center justify-between bg-white/10 rounded-lg p-3">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span>MapMaster</span>
-            </div>
-            <span className="text-green-500 flex items-center text-sm">
-              <Check size={16} className="mr-1" />
-              Ready
-            </span>
-          </div>
-        </div>
+        <GameStatus />
       </div>
       
       <div className="flex flex-col items-center">
