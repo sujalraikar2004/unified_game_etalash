@@ -30,9 +30,9 @@ const playerSchema = new mongoose.Schema({
   username: String,
   userId: String,
   highScore: { type: Number, default: 0 },
-  gamesCompleted: { type: Number, default: 0 },
+  completionTime: { type: Number, default: null },
   fastestTime: { type: Number, default: null }
-});
+},{timestamps: true});
 
 const Player = mongoose.model('Player', playerSchema);
 
