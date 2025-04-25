@@ -47,63 +47,63 @@ const initialQuestions: Question[] = [
     answer: "treasure",
     points: 100
   },
-  {
-    id: 2,
-    text: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
-    answer: "echo",
-    points: 150
-  },
-  {
-    id: 3,
-    text: "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?",
-    answer: "map",
-    points: 200
-  },
-  {
-    id: 4,
-    text: "The more you take, the more you leave behind. What are they?",
-    answer: "footsteps",
-    points: 120
-  },
-  {
-    id: 5,
-    text: "I'm light as a feather, but even the strongest person can't hold me for more than a few minutes. What am I?",
-    answer: "breath",
-    points: 180
-  },
-  {
-    id: 6,
-    text: "What has many keys but can't open a single lock?",
-    answer: "piano",
-    points: 150
-  },
-  {
-    id: 7,
-    text: "What gets wet while drying?",
-    answer: "towel",
-    points: 100
-  },
-  {
-    id: 8,
-    text: "What goes up but never comes down?",
-    answer: "age",
-    points: 120
-  },
-  {
-    id: 9,
-    text: "If you drop me, I'm sure to crack. Give me a smile, and I'll smile back. What am I?",
-    answer: "mirror",
-    points: 180
-  },
-  {
-    id: 10,
-    text: "What treasure do pirates value most?",
-    answer: "gold",
-    points: 200
-  }
+  // {
+  //   id: 2,
+  //   text: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
+  //   answer: "echo",
+  //   points: 150
+  // },
+  // {
+  //   id: 3,
+  //   text: "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?",
+  //   answer: "map",
+  //   points: 200
+  // },
+  // {
+  //   id: 4,
+  //   text: "The more you take, the more you leave behind. What are they?",
+  //   answer: "footsteps",
+  //   points: 120
+  // },
+  // {
+  //   id: 5,
+  //   text: "I'm light as a feather, but even the strongest person can't hold me for more than a few minutes. What am I?",
+  //   answer: "breath",
+  //   points: 180
+  // },
+  // {
+  //   id: 6,
+  //   text: "What has many keys but can't open a single lock?",
+  //   answer: "piano",
+  //   points: 150
+  // },
+  // {
+  //   id: 7,
+  //   text: "What gets wet while drying?",
+  //   answer: "towel",
+  //   points: 100
+  // },
+  // {
+  //   id: 8,
+  //   text: "What goes up but never comes down?",
+  //   answer: "age",
+  //   points: 120
+  // },
+  // {
+  //   id: 9,
+  //   text: "If you drop me, I'm sure to crack. Give me a smile, and I'll smile back. What am I?",
+  //   answer: "mirror",
+  //   points: 180
+  // },
+  // {
+  //   id: 10,
+  //   text: "What treasure do pirates value most?",
+  //   answer: "gold",
+  //   points: 200
+  // }
 ];
 
-const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://10.10.2.189:3001';
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
